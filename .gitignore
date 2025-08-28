@@ -1,0 +1,6 @@
+elpa/
+etc/
+var/
+*.~undo-tree~
+custom.el
+init.el
