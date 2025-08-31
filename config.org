@@ -38,14 +38,6 @@
   (package-initialize)
 #+end_src
 
-** use-package
-#+begin_src emacs-lisp
-  ;; 安装 use-package, emacs30.1 内置 use-package
-  (unless (package-installed-p 'use-package)
-    (package-refresh-contents)
-    (package-install 'use-package))
-#+end_src
-
 ** 加载 =custom.el= 中的自定义设置
 #+begin_src emacs-lisp
   (setq custom-file (expand-file-name "custom.el" user-emacs-directory))
@@ -327,7 +319,26 @@
   		  ("<drag-mouse-1>" ignore)
   		  ("q" nil)))
 #+end_src
+** 自动中英文切换 [[https://github.com/laishulu/emacs-smart-input-source][sis]]
+#+begin_src emacs-lisp
+  (use-package sis
+    :ensure t
+    ;; :hook
+    ;; enable the /context/ and /inline region/ mode for specific buffers
+    ;; (((text-mode prog-mode) . sis-context-mode)
+    ;;  ((text-mode prog-mode) . sis-inline-mode))
 
+    :config
+    ;; enable the /cursor color/ mode
+    (sis-global-cursor-color-mode t)
+    ;; enable the /respect/ mode
+    (sis-global-respect-mode t)
+    ;; enable the /context/ mode for all buffers
+    (sis-global-context-mode t)
+    ;; enable the /inline english/ mode for all buffers
+    ;; (sis-global-inline-mode t)
+    )
+#+end_src
 * 补全
 ** 不区分大小写
 #+begin_src emacs-lisp
@@ -462,13 +473,113 @@ minibuffer 信息增强
               (kill-process "ehook"))))
 #+end_src
 
-** 统一其它编辑pture
+** 统一其它编辑按键
 #+begin_src emacs-lisp
-  (setq org-capture-templates
-        `(("t" "Todo" entry (file+headline ,(expand-file-name "inbox.org" org-directory) "Workspace")
-           "* TODO [#B] %?\n  %i\n %U"
-           :empty-lines 1)))
+  (setq w32-apps-modifier 'super)
+
+  (global-set-key (kbd "s-a") 'mark-whole-buffer)
+  (global-set-key (kbd "s-c") 'kill-ring-save)
+  (global-set-key (kbd "s-s") 'save-buffer)
+  (global-set-key (kbd "s-v") 'yank)
+  (global-set-key (kbd "s-z") 'undo-tree-undo)
+  (global-set-key (kbd "s-Z") 'undo-tree-redo)
+  (global-set-key (kbd "s-x") 'kill-region)
+  (global-set-key (kbd "s-/") 'comment-or-uncomment-region)
 #+end_src
+
+* 自定义功能
+** 快速打开配置文件
+#+begin_src emacs-lisp
+  (defun my/open-config-file ()
+    (interactive)
+    (find-file (expand-file-name "config.org" user-emacs-directory)))
+
+  (global-set-key (kbd "<f6>") #'my/open-config-file)
+#+end_src
+
+** 在资源管理器中打开文件
+#+begin_src emacs-lisp
+  (defun my/open-in-file-manager (target)
+    "在系统的文件管理器中打开 TARGET 所在的目录。
+  TARGET 可以是一个文件路径或一个目录路径。"
+    ;; interactive 规则 "F" 可以智能处理文件和目录，更具通用性
+    (interactive "FOpen in file manager: ")
+    (let ((directory-to-open
+           ;; expand-file-name 确保路径是绝对路径
+           ;; file-name-directory 获取目标所在的目录
+           ;; 如果目标本身就是目录, 则直接使用该目录
+           (file-name-directory (expand-file-name target))))
+      (pcase system-type
+        ;; Windows: 使用原生API，最稳定可靠，无需处理编码和路径分隔符
+        ('windows-nt
+         (w32-shell-execute "open" directory-to-open))
+        ;; macOS: 使用 open 命令
+        ('darwin
+         (call-process "open" nil 0 nil directory-to-open))
+        ;; 其他 (主要是 Linux): 使用 xdg-open
+        (_
+         (call-process "xdg-open" nil 0 nil directory-to-open)))))
+#+end_src
+
+在系统的文件管理器中打开当前文件所在的目录
+#+begin_src emacs-lisp
+  ;; 提供一个独立的命令来打开当前目录
+  (defun my/open-current-directory-externally ()
+    "在系统的文件管理器中打开当前文件所在的目录。"
+    (interactive)
+    (my/open-in-file-manager default-directory))
+
+  (global-set-key (kbd "<f8>") #'my/open-current-directory-externally)
+#+end_src
+* 其它
+** windows 临时文件夹设置
+防止 Windows 用 ~<user name>~1~ 命名家目录, 用于修复 ~org-preview-latex~ 的 bug
+#+begin_src emacs-lisp
+  (when (eq system-type 'windows-nt)
+    (setq temporary-file-directory
+  	(concat (replace-regexp-in-string "\\\\" "/" (getenv "LOCALAPPDATA")) "/Temp")))
+#+end_src
+* Org-mode
+#+BEGIN_SRC emacs-lisp
+  (setq org-directory (expand-file-name "Projects/org/" my-cloud-dir))
+  (setq org-agenda-files `(,(expand-file-name "Agenda/" org-directory)))
+  
+
+  (require 'org-tempo)  ;开启easy template
+
+  ;; 禁用左尖括号
+  (setq electric-pair-inhibit-predicate
+        `(lambda (c)
+           (if (char-equal c ?\<) t (,electric-pair-inhibit-predicate c))))
+
+  (add-hook 'org-mode-hook
+            (lambda ()
+              (setq-local electric-pair-inhibit-predicate
+                          `(lambda (c)
+                             (if (char-equal c ?\<) t (,electric-pair-inhibit-predicate c))))))
+#+END_SRC
+
+
+#+begin_src emacs-lisp
+(use-package org-roam
+   :ensure t
+   :after org
+   :init
+   (setq org-roam-v2-ack t) ;; Acknowledge V2 upgrade
+   :config
+   (org-roam-setup)
+   :custom
+   (org-roam-directory (concat org-directory "roam/")) ; 设置 org-roam 目录
+   :bind
+   (("C-c n f" . org-roam-node-find)
+    (:map org-mode-map
+          (("C-c n i" . org-roam-node-insert)
+           ("C-c n o" . org-id-get-create)
+           ("C-c n t" . org-roam-tag-add)
+           ("C-c n a" . org-roam-alias-add)
+           ("C-c n l" . org-roam-buffer-toggle)))))
+#+end_src
+
 * TODO magit
 #+begin_src emacs-lisp :tangle no
   (use-package magit
