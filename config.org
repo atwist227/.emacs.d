@@ -34,6 +34,7 @@
   (setq package-archives '(("gnu"    . "https://mirrors.tuna.tsinghua.edu.cn/elpa/gnu/")
                            ("nongnu" . "https://mirrors.tuna.tsinghua.edu.cn/elpa/nongnu/")
                            ("melpa"  . "https://mirrors.tuna.tsinghua.edu.cn/elpa/melpa/")))
+
   (package-initialize)
 #+end_src
 
@@ -72,7 +73,7 @@
   (setq inhibit-startup-message t)
   (setq confirm-kill-emacs #'yes-or-no-p) ; 在关闭 Emacs 前询问是否确认关闭，防止误触
   (setq visible-bell t)                   ; 使用屏幕闪烁替代提示音
-  (setq make-backup-files nil)            ; 关闭文件自动备份
+  ;; (setq make-backup-files nil)            ; 关闭文件自动备份
   (fset 'yes-or-no-p 'y-or-n-p)           ; 设置 yes or no 别名
 
   ;; 自动更新 buffer
@@ -83,13 +84,14 @@
 用 =no-littering= 保持文件夹整洁
 #+begin_src emacs-lisp
   (use-package no-littering
-    :ensure t)
+    :ensure t
+    :config
+    (no-littering-theme-backups))
 #+end_src
 ** 最近文件(Recent Files)
 #+begin_src emacs-lisp
   (use-package recentf
-    :after no-littering
-    :demand t 
+    :after no-littering 
     :custom
     (recentf-exclude '(no-littering-var-directory
                        no-littering-etc-directory)) ; 屏蔽临时文件
@@ -103,8 +105,8 @@
 #+begin_src emacs-lisp
   (use-package savehist
     :defer t
-    :hook (after-init . savehist-mode)
     :config
+    (savehist-mode 1)
     (setq enable-recursive-minibuffers t
   	    history-length 1000
   	    savehist-autosave-interval 300
@@ -125,11 +127,13 @@
 ** 自动保存文件 (super-save)
 #+begin_src emacs-lisp
   (use-package super-save
-    :defer 1
-    :hook
-    (after-init . super-save-mode)
-    :custom
-    (super-save-auto-save-when-idle t))
+    :ensure t
+    :config
+    (super-save-mode +1)
+    (setq super-save-auto-save-when-idle t))
+
+  ;; disable built-in auto-save-mode
+  ;; (setq auto-save-default nil)
 #+end_src
 
 ** 按键提示 (which-key)
@@ -201,7 +205,7 @@
 
   (scroll-bar-mode -1)   ; 关闭滚动条
   (tool-bar-mode -1)     ; 关闭工具栏
-  ;; (menu-bar-mode -1)     ; 关闭菜单栏
+  (menu-bar-mode -1)     ; 关闭菜单栏
 #+end_src
 ** 光标样式
 #+begin_src emacs-lisp
@@ -369,8 +373,7 @@
     :bind
     (("C-x b" . 'consult-buffer)    ;; Switch buffer, including recentf and bookmarks
      ("M-l"   . 'consult-git-grep)  ;; Search inside a project
-     ("M-y"   . 'consult-yank-pop)  ;; Paste by selecting the kill-ring
-     ("M-s"   . 'consult-line)      ;; Search current buffer, like swiper
+     ("s-f"   . 'consult-line)      ;; Search current buffer, like swiper
      ))
 
   (use-package embark
@@ -442,307 +445,24 @@ minibuffer 信息增强
 #+end_src
 
 * 键位绑定
+** [[https://github.com/reseen/eHook][eHook]] 工具改键
+因为windows上修改键位太麻烦，启用了ehook工具使得在 emacs 程序中：
+- CapsLock -> Left Ctrl
+- Left Ctrl -> Super
+- Rright Ctrl -> CapsLock
+既解决了小拇指问题，又解决了不同程序统一复制粘贴的问题。(其实还有一点问题，就是启用中文输入法时候快捷键不起效，但这是所有快捷键的问题.）
 #+begin_src emacs-lisp
-  ;; 绑定常用帮助命令
-  (global-set-key (kbd "C-h C-f") #'find-function)
-  (global-set-key (kbd "C-h C-v") #'find-variable)
-  (global-set-key (kbd "C-h C-k") #'find-function-on-key)
+;; 启动 Emacs 时运行 eHook.exe
+(start-process "ehook" nil "D:\\Apps\\ehook\\eHook.exe")
 
-  ;; ibuffer
-  (global-set-key (kbd "C-x C-b") #'ibuffer)
-
-  ;; 刷新 buffer
-  (global-set-key (kbd "<f5>") #'revert-buffer)
-
-  (global-set-key (kbd "M-w") 'kill-region)              ; 交换 M-w 和 C-w，M-w 为剪切
-(global-set-key (kbd "C-w") 'kill-ring-save)           ; 交换 M-w 和 C-w，C-w 为复制
-(global-set-key (kbd "C-c '") 'comment-or-uncomment-region) ; 为选中的代码加注释/去注释
+;; Emacs 退出时关闭 eHook.exe
+(add-hook 'kill-emacs-hook
+          (lambda ()
+            (when (get-process "ehook")
+              (kill-process "ehook"))))
 #+end_src
 
-Faster move curesor
-#+begin_src emacs-lisp
-  ;; Faster move cursor
-  (defun next-ten-lines()
-    "Move cursor to next 10 lines."
-    (interactive)
-    (next-line 10))
-
-  (defun previous-ten-lines()
-    "Move cursor to previous 10 lines."
-    (interactive)
-    (previous-line 10))
-
-  (global-set-key (kbd "M-n") 'next-ten-lines)            ; 光标向下移动 10 行
-  (global-set-key (kbd "M-p") 'previous-ten-lines)        ; 光标向上移动 10 行
-#+end_src
-
-#+begin_src emacs-lisp
-  (global-unset-key (kbd "C-z"))
-  (global-unset-key (kbd "C-j"))
-#+end_src
-
-* 自定义功能
-** 快速打开配置文件
-#+begin_src emacs-lisp
-  (defun my/open-config-file ()
-    (interactive)
-    (find-file (expand-file-name "config.org" user-emacs-directory)))
-
-  (global-set-key (kbd "<f6>") #'my/open-config-file)
-#+end_src
-
-** 在资源管理器中打开文件
-#+begin_src emacs-lisp
-  (defun my/open-in-file-manager (target)
-    "在系统的文件管理器中打开 TARGET 所在的目录。
-  TARGET 可以是一个文件路径或一个目录路径。"
-    ;; interactive 规则 "F" 可以智能处理文件和目录，更具通用性
-    (interactive "FOpen in file manager: ")
-    (let ((directory-to-open
-           ;; expand-file-name 确保路径是绝对路径
-           ;; file-name-directory 获取目标所在的目录
-           ;; 如果目标本身就是目录, 则直接使用该目录
-           (file-name-directory (expand-file-name target))))
-      (pcase system-type
-        ;; Windows: 使用原生API，最稳定可靠，无需处理编码和路径分隔符
-        ('windows-nt
-         (w32-shell-execute "open" directory-to-open))
-        ;; macOS: 使用 open 命令
-        ('darwin
-         (call-process "open" nil 0 nil directory-to-open))
-        ;; 其他 (主要是 Linux): 使用 xdg-open
-        (_
-         (call-process "xdg-open" nil 0 nil directory-to-open)))))
-#+end_src
-
-在系统的文件管理器中打开当前文件所在的目录
-#+begin_src emacs-lisp
-  ;; 提供一个独立的命令来打开当前目录
-  (defun my/open-current-directory-externally ()
-    "在系统的文件管理器中打开当前文件所在的目录。"
-    (interactive)
-    (my/open-in-file-manager default-directory))
-
-  (global-set-key (kbd "<f8>") #'my/open-current-directory-externally)
-#+end_src
-
-* 其它
-** windows 临时文件夹设置
-防止 Windows 用 ~<user name>~1~ 命名家目录, 用于修复 ~org-preview-latex~ 的 bug
-#+begin_src emacs-lisp
-  (when (eq system-type 'windows-nt)
-    (setq temporary-file-directory
-  	(concat (replace-regexp-in-string "\\\\" "/" (getenv "LOCALAPPDATA")) "/Temp")))
-#+end_src
-* TODO Latex
-:PROPERTIES:
-:header-args:emacs-lisp: :tangle no
-:END:
-Format math as a Latex string with Calc
-#+begin_src emacs-lisp
-  (defun my/latex-math-from-calc ()
-    "Evaluate `calc' on the contents of line at point."
-    (interactive)
-    (cond ((region-active-p)
-           (let* ((beg (region-beginning))
-                  (end (region-end))
-                  (string (buffer-substring-no-properties beg end)))
-             (kill-region beg end)
-             (insert (calc-eval `(,string calc-language latex
-                                          calc-prefer-frac t
-                                          calc-angle-mode rad)))))
-          (t (let ((l (thing-at-point 'line)))
-               (end-of-line 1) (kill-line 0) 
-               (insert (calc-eval `(,l
-                                    calc-language latex
-                                    calc-prefer-frac t
-                                    calc-angle-mode rad)))))))
-#+end_src
-
-#+begin_src emacs-lisp
-  (use-package latex
-    :ensure auctex
-    :hook ((LaTeX-mode . prettify-symbols-mode))
-    :bind (:map LaTeX-mode-map
-                ("C-S-e" . my/latex-math-from-calc))
-    :config
-    (setq TeX-auto-save t
-  	    TeX-parse-self t
-  	    TeX-save-query nil
-  	    TeX-PDF-mode t
-  	    TeX-command-default "LatexMk"
-  	    TeX-source-correlate-mode t
-  	    TeX-source-correlate-start-server t
-  	    prettify-symbols-unprettify-at-point t)
-    
-    ;; PDF 查看器：SumatraPDF
-    (setq TeX-view-program-selection '((output-pdf "SumatraPDF"))
-          TeX-view-program-list
-          `(("SumatraPDF"
-    	       (,(concat "\"" (replace-regexp-in-string "\\\\" "/" (getenv "LOCALAPPDATA"))
-                       "/SumatraPDF/SumatraPDF.exe\" -reuse-instance")
-              (mode-io-correlate " -forward-search %b %n ") " %o")))))
-#+end_src
-
-** CDLatex settings
-#+begin_src emacs-lisp
-    ;; CDLatex settings
-    (use-package cdlatex
-      :ensure t
-      :hook (LaTeX-mode . turn-on-cdlatex)
-      :bind (:map cdlatex-mode-map 
-                  ("<tab>" . cdlatex-tab)))
-#+end_src
-
-** Yasnippet settings
-Function that tries to autoexpand YaSnippets
-#+begin_src emacs-lisp
-  (defun my/yas-try-expanding-auto-snippets ()
-    (when (and (boundp 'yas-minor-mode) yas-minor-mode)
-      (let ((yas-buffer-local-condition ''(require-snippet-condition . auto)))
-        (yas-expand))))
-#+end_src
-
-#+begin_src emacs-lisp :tangle no
-  ;; Yasnippet settings
-  (use-package yasnippet
-    :ensure t
-    :hook ((LaTeX-mode . yas-minor-mode)
-           (post-self-insert . my/yas-try-expanding-auto-snippets))
-    :config
-    (setq yas-snippet-dirs (concat user-emacs-directory "snippets/"))
-    (use-package warnings
-      :config
-      (cl-pushnew '(yasnippet backquote-change)
-                  warning-suppress-types
-                  :test 'equal))
-
-    (setq yas-triggers-in-field t))
-#+end_src
-
-#+begin_src emacs-lisp
-    ;; CDLatex integration with YaSnippet: Allow cdlatex tab to work inside Yas
-    ;; fields
-    (use-package cdlatex
-      :hook ((cdlatex-tab . yas-expand)
-             (cdlatex-tab . cdlatex-in-yas-field))
-      :config
-      (use-package yasnippet
-        :bind (:map yas-keymap
-                    ("<tab>" . yas-next-field-or-cdlatex)
-                    ("TAB" . yas-next-field-or-cdlatex))
-        :config
-        (defun cdlatex-in-yas-field ()
-          ;; Check if we're at the end of the Yas field
-          (when-let* ((_ (overlayp yas--active-field-overlay))
-                      (end (overlay-end yas--active-field-overlay)))
-            (if (>= (point) end)
-                ;; Call yas-next-field if cdlatex can't expand here
-                (let ((s (thing-at-point 'sexp)))
-                  (unless (and s (assoc (substring-no-properties s)
-                                        cdlatex-command-alist-comb))
-                    (yas-next-field-or-maybe-expand)
-                    t))
-              ;; otherwise expand and jump to the correct location
-              (let (cdlatex-tab-hook minp)
-                (setq minp
-                      (min (save-excursion (cdlatex-tab)
-                                           (point))
-                           (overlay-end yas--active-field-overlay)))
-                (goto-char minp) t))))
-
-        (defun yas-next-field-or-cdlatex nil
-          (interactive)
-          "Jump to the next Yas field correctly with cdlatex active."
-          (if
-              (or (bound-and-true-p cdlatex-mode)
-                  (bound-and-true-p org-cdlatex-mode))
-              (cdlatex-tab)
-            (yas-next-field-or-maybe-expand)))))
-
- ;;(straight-use-package
-  ;; '(lazytab :type git :host github :repo "karthink/lazytab"))
-
-  ;; Array/tabular input with org-tables and cdlatex 
-  (use-package org-table
-    :after cdlatex
-    :bind (:map orgtbl-mode-map
-                ("<tab>" . lazytab-org-table-next-field-maybe)
-                ("TAB" . lazytab-org-table-next-field-maybe))
-    :init
-    (add-hook 'cdlatex-tab-hook 'lazytab-cdlatex-or-orgtbl-next-field 90)
-    ;; Tabular environments using cdlatex
-    (add-to-list 'cdlatex-command-alist '("smat" "Insert smallmatrix env"
-                                          "\\left( \\begin{smallmatrix} ? \\end{smallmatrix} \\right)"
-                                          lazytab-position-cursor-and-edit
-                                          nil nil t))
-    (add-to-list 'cdlatex-command-alist '("bmat" "Insert bmatrix env"
-                                          "\\begin{bmatrix} ? \\end{bmatrix}"
-                                          lazytab-position-cursor-and-edit
-                                          nil nil t))
-    (add-to-list 'cdlatex-command-alist '("pmat" "Insert pmatrix env"
-                                          "\\begin{pmatrix} ? \\end{pmatrix}"
-                                          lazytab-position-cursor-and-edit
-                                          nil nil t))
-    (add-to-list 'cdlatex-command-alist '("tbl" "Insert table"
-                                          "\\begin{table}\n\\centering ? \\caption{}\n\\end{table}\n"
-                                          lazytab-position-cursor-and-edit
-                                          nil t nil)))
-#+end_src
-
-#+begin_src emacs-lisp
-  ;; Auto compile on save
-  (defun my/latex-auto-compile ()
-    "Automatically compile LaTeX file with latexmk after saving."
-    (when (eq major-mode 'latex-mode)
-      (TeX-save-document (TeX-master-file))
-      (TeX-command "LatexMk" 'TeX-master-file -1)))
-
-  (add-hook 'latex-mode-hook
-            (lambda ()
-              (add-hook 'after-save-hook #'my/latex-auto-compile nil 'local)))
-#+end_src
-
-* TODO Org Mode
-** org 文件目录
-#+begin_src emacs-lisp
-  (setq org-directory (expand-file-name "Projects/org/" my-cloud-dir))
-#+end_src
-** 增强工具包
-#+begin_src emacs-lisp
-  (use-package org-contrib
-    :ensure t
-    :after org)
-#+end_src
-** 启用简易模板
-#+begin_src emacs-lisp
-  ;; 启用 Org Mode 的简易模板
-  (require 'org-tempo)
-
-  ;; 在 Org Mode 中禁用左尖括号的自动配对
-  (add-hook 'org-mode-hook
-  	  (lambda ()
-  	    (setq-local electric-pair-inhibit-predicate
-  			`(lambda (c)
-  			   (if (char-equal c ?<) t (,electric-pair-inhibit-predicate c))))))
-#+end_src
-** org-agenda
-#+begin_src emacs-lisp
-  (setq org-agenda-files
-        (directory-files-recursively
-         org-directory
-         "\\.org\\'"))
-#+end_src
-** org-todo
-#+begin_src emacs-lisp
-  (setq org-todo-keywords
-        (quote ((sequence "TODO(t)" "STARTED(s)" "|" "DONE(d!/!)")
-                (sequence "WAITING(w@/!)" "SOMEDAY(S)" "|" "CANCELLED(c@/!)" "MEETING(m)" "PHONE(p)"))))
-
-  (require 'org-checklist)
-  (setq org-log-into-drawer t)
-#+end_src
-** org-capture
+** 统一其它编辑pture
 #+begin_src emacs-lisp
   (setq org-capture-templates
         `(("t" "Todo" entry (file+headline ,(expand-file-name "inbox.org" org-directory) "Workspace")
@@ -750,7 +470,7 @@ Function that tries to autoexpand YaSnippets
            :empty-lines 1)))
 #+end_src
 * TODO magit
-#+begin_src emacs-lisp
+#+begin_src emacs-lisp :tangle no
   (use-package magit
     :ensure t)
 #+end_src
